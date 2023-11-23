@@ -5,3 +5,145 @@ date: "2023-11-23"
 output: html_document
 ---
 
+```{r warning=FALSE}
+library(rgbif)
+library(rworldxtra)
+library(raster)
+library(sf)
+library(tidyverse)
+```
+#La función occ_count retorna la cantidad de registros de presencia de acuerdo con criterios como código del taxón (taxonKey), tipo de registro (basis OfRecord), pais y año, entre otros.
+
+```{r}
+occ_count()
+```
+
+```{r warning=FALSE}
+occ_count(georeferenced = TRUE)
+```
+
+```{r}
+cl_isocode <- isocodes[grep("Chile", isocodes$name), "code"]
+## CONTEO
+occ_count(country=cl_isocode)
+```
+
+```{r}
+isocodes
+```
+
+```{r warning=FALSE}
+occ_count(country=cl_isocode, georeferenced = TRUE)
+```
+
+```{r}
+#registros de Pudus ubicados en Chile
+#georreferenciados obtención del código del taxon
+name <- name_backbone(name = "Pudu puda", rank = "species")
+name[, c("usageKey", "scientificName")]
+```
+
+```{r warning=FALSE}
+occ_count(taxonKey = 2435099, country = "CL", georeferenced = TRUE)
+```
+
+```{r warning=FALSE}
+pudu_cl <- occ_count(taxonKey = 2435099, country = "CL", georeferenced = TRUE)
+```
+
+
+#####
+#Nos vamos a concentrar en describir la distribución de Pudu puda
+#Usaremos occ_search() y occ_data() para recuperar presencias. Obtendremos nombre cientifico, pais, contienen, fecha, entre otros datos
+#occ_search nos da un resumen de los resultados como los del paquete dplyr de Tidyverse, mientras que occ_data está optimizada para ser más eficiente
+
+## OJO -> Solo se entregan máximo de 100.000 registos en cada llamada
+
+```{r warning=FALSE}
+occ_search(scientificName = "Pudu puda", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE)
+```
+```{r}
+ppuda_CL <- occ_search(scientificName = "Pudu puda", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE)
+```
+
+```{r}
+pudu_CL <- ppuda_CL$data
+```
+
+```{r}
+name <- name_backbone(name = "Pudu puda", rank = "species")
+name[, c("usageKey", "scientificName")]
+```
+
+```{r warning=FALSE}
+PU_CL_REF <- occ_count(taxonKey = 2440911, country = "CL", georeferenced = TRUE)
+PU_CL_REF
+```
+
+```{r}
+pudu_CL |>
+  distinct(decimalLatitude, decimalLongitude, verbatimLocality)|>
+  arrange(decimalLatitude)
+```
+```{r}
+library(ggplot2)
+library(curl)
+```
+
+
+```{r}
+coordenadas <- tibble(x = pudu_CL$decimalLongitude, y = pudu_CL$decimalLatitude) |>
+                  st_as_sf(coords = c("x" , "y"), crs="+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+
+ggplot() + geom_sf(data = coordenadas) + theme_bw()
+
+com_tmp = tempfile()
+com = curl_download("https://www.bcn.cl/obtienearchivo?id=repositorio/10221/10396/2/Comunas.zip",com_tmp)
+unzip(com)
+
+lr = read_sf("comunas.shp", quiet=TRUE) %>%
+  #dplyr::filter(Region == 'Región de Los Ríos'| Region == 'Región de Los Lagos') %>%
+  dplyr::select(Comuna, Provincia, Region) %>%
+  st_transform(crs=32719)
+
+ggplot() +
+  geom_sf(data = lr) +
+  geom_sf(data = coordenadas) + theme_bw()
+
+
+library(mapview)
+
+mapview(lr)
+
+mapview(coordenadas)
+
+```
+
+
+```{r}
+Bioclim <- getData("worldclim", var = "bio", res = 2.5) %>% crop(coordenadas)
+plot(Bioclim)
+
+```
+
+```{r}
+Clima <- raster::extract(Bioclim, coordenadas) %>% as.data.frame()
+Clima
+
+```
+```{r}
+install.packages("ggcorrplot")
+library(ggcorrplot)
+corr <- cor(Clima,use = "pairwise")
+ggcorrplot(corr)
+```
+```{r}
+Bioclim <- Bioclim[[c(1,7,12,15)]]
+plot(Bioclim)
+
+```
+
+
+
+
+
