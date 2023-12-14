@@ -4,136 +4,155 @@ author: "Nadja Aranda"
 date: "2023-12-11"
 output: html_document
 ---
-##Primero instalamos las librerias que utilizaremos
 
 ```{r}
-install.packages("rgbif")
-install.packages("rworldxtra")
-install.packages("raster")
-install.packages("sf")
-install.packages("tidyverse")
-install.packages("kableExtra")
-install.packages("terra")
-install.packages("ggcorrplot")
-```
-##Luego, cargamos las librerias
-
-```{r}
-library("rgbif")
-library("rworldxtra")
-library("raster")
-library("sf")
-library("tidyverse")
-library("kableExtra")
-library("terra")
-library("ggcorrplot")
+#install.packages("rgbif")
+#install.packages("rworldextra")
+#install.packages("raster")
+#install.packages("sf")
+#install.packages("tidyverse")
+#install.packages("rOpenSci")
+#install.packages("kableExtra")
 ```
 
-## Reporte
-Con estos ejercicios iremos haciendo un reporte, que sera evaluado entregado el 15 de Diciembre 2023.
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(rgbif)
+library(rworldxtra)
+library(raster)
+library(sf)
+library(tidyverse)
+library(ggplot2)
+library(kableExtra)
+library(pacman)
+```
 
-Se trabajrá con la especie Zorro Chilla (Lycalopex griseus)
 
-### Descripción de datos y análisis preliminar
-  a.  ¿Cuántos registros totales existen? y ¿En cuántas localidades únicas?
-  R: La función occ_count otorga la cantidad de registros de presencia de acuerdo al código de taxón, tipo de registro, etc. Registrando un total de 2593302597 registros.
-
+#Total de registros de peresencia en GBIF
 ```{r}
 occ_count()
 ```
 
-## Como sólo nos interesa el chilla:
-```{r lg-cl, echo=TRUE}
-name <- name_backbone(name='Lycalopex griseus', rank='species') 
-
-# Obtención del código del taxón
-print(name[, c('usageKey', 'scientificName')])
+#Cantidad de registros georreferenciados en Chile
+```{r}
+cl_isocode <- isocodes[grep("Chile", isocodes$name),"code"]
+occ_count(country=cl_isocode, georeferenced = TRUE)
 ```
 
-Usando el número de registro para *Lycalopex griseus* en la Base de datos GBIF podemos contarlos:
+1.  Describir los datos de ocurrencia de *Galictis cuja* en base de datos [GBIF](http://www.gbif.org)
+  a.  ¿Cuántos registros totales existen? y ¿En cuántas localidades únicas?
+  
+  R:  
 
+Busquemos para Quique en Chile georreferenciados, obtención del código del taxon
 ```{r}
-Lyg <- occ_search(scientificName = "Lycalopex griseus", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 600)
-
-Lyg
+name <- name_backbone(name = "Galictis cuja", rank = "species")
+name[, c("usageKey", "scientificName")]
 ```
+Nos entrega 2434870 Lycalopex culpaeus (Molina, 1782)
 
+contamos
 ```{r}
-Lyg$data |>
-  group_by(year) |>
+gcuja<- occ_search(scientificName = "Galictis cuja", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 500)
+
+occ_search(scientificName = "Galictis cuja", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 500)
+```
+Me entrega [1] 386  significa que hay 386 datos georeferenciados asociados a esto
+Se filtra el conteo total de avistamientos del chungungo para CL, Chile, se asocia a "gcuja_ch"
+```{r gcuja_ch, echo=TRUE, warning=FALSE}
+gcuja_ch <- occ_count(taxonKey = 5218901, 
+          country = 'CL',
+          georeferenced = TRUE)
+```
+Luego, para trabajar con ello se filtra y se asocia a "lyca", luego se grafica esta data para observar la ocurrencia a traves de los años.
+```{r timeserie , echo=TRUE}
+cuja_sf |>
+  group_by(year)|>
   count() |>
-  ggplot(aes(x=year,y=n)) + geom_line()+geom_point()
+  ggplot(aes(x=year,y=n)) +
+    geom_line(color='MidnightBlue') +  geom_point() +
+    ylab("Número de registros") + xlab("Año")+ 
+    ggtitle("Registros de G. cuja en GBIF  por año") +
+    geom_smooth(method = 'gcuja',color="SaddleBrown", formula = y~x,alpha=.4)
+
 ```
-
-```{r}
-#Ahora veremos en cuantas localidades únicas
-Localidades = unique(Lyg$data$verbatimLocality)
-
-Localidades
-```
-
-##Obteniendo un total de 600 registros en 78 localidades
 
   b.  ¿Qué otros datos pueden asociarse a dichos registros? (bonus, no lo vimos en clase!)
+  
+  R: 
 
-### Mapeo y representación gráfica
-2.  Hacer un mapa de la distribución de tu *especie de preferencia* para Chile
 
-```{r lyca-sf, echo=TRUE}
-Lyg_sf <- st_as_sf(Lyg$data, coords = c("decimalLongitude", "decimalLatitude"), 
+2.  Hacer un mapa de la distribución de *G. cuja* para Chile
+  a.  ¿En cuántas Regiones encontramos a esta expecie?
+  
+  R:
+#Utilizamos occ_search occ_search nos da un resumen de resultados como los del paquete dplyr de Tidyverse, mientras que occ_data está optimizada para ser más eficiente.
+```{r}
+gcuja_data<- occ_search(scientificName = "Galictis cuja", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 500)
+
+occ_search(scientificName = "Galictis cuja", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 500)
+```
+
+Podemos ver los datos en tabla donde se ven los nombres de columnas con `names()`:
+```{r cols-cuja-gbif-chile, echo=TRUE}
+names(gcuja_data$data) |>
+  kbl() |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),fixed_thead = T) |>
+  scroll_box(width = "100%", height = "350px")
+```
+
+Se observa que existe "locality", con ello se puede extraer la cantidad de localidades en las que se encuentra L. culpaeus:
+```{r localities, echo=TRUE}
+unique(gcuj$data$locality) |>
+  kbl() |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),fixed_thead = T) |>
+  scroll_box(width = "100%", height = "350px")
+```
+Se observa un total de 24 localidades, contando como 1 a "NA".
+
+Se asocian los datos con coordenadas a un shapefile.
+```{r cuja-sf, echo=TRUE}
+cuja_sf <- st_as_sf(gcuja_data$data, coords = c("decimalLongitude", "decimalLatitude"), 
                    crs= "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
 ```
 
-
+Para poder obtener la cantidad de regiones con avistamientos primero se debe reorganizar la informacion, uniendo los nombres que aludan a lo mismo pero escritos distinto, para ello se visualiza a cuales corresponden estos:
 ```{r}
-Lyg_sf|>
-  kbl() |>
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
-  scroll_box(width = "100%", height = "400px")
+unique(cuja_sf$stateProvince)
 ```
 
-```{r mapa-ggplot, echo=TRUE}
-data("countriesHigh")
-cl <- countriesHigh |>
-  st_as_sf() |>
-  dplyr::filter(NAME=="Chile") |>
-  st_make_valid()
-
-ggplot() + 
-  geom_sf(data=cl,alpha=.4 ) +
-  geom_sf(data = Lyg_sf, alpha=.3 ) +
-  ylim(st_bbox(Lyg_sf)[2]-.2,st_bbox(Lyg_sf)[4]+.2) +
-  xlim(st_bbox(Lyg_sf)[1]-.5,st_bbox(Lyg_sf)[3]+.5)
-```
-
-  a.  ¿En cuántas Regiones encontramos a esta expecie?
-##Para ver en cuántas regiones agruparemos por provincias y los diferentes nombres de las regiones para que no se repitan:
-```{r}
-Regiones <- Lyg$data |>
-  dplyr::mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Los Ríos", "Los Rios", "Región de Los Ríos"),"Los Ríos")) |>
-  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Araucanía", "Araucania", "IX Region (AraucanÃ­a)", "La Araucania", "Región de La Araucanía"),'Araucanía')) |>
-  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Región Metropolitana de Santiago", "Región Metropolitana", "Metropolitana", "Santiago Metropolitan", "Santiago"), "Metropolitana")) |>
-  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Libertador General Bernardo O'Higgins", "Región del Libertador Bernardo O’Higgins", "O'Higgins", "OHiggins", "Región del Libertador General Bernardo O'Higgins"), "O'Higgins")) |>
-  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("VIII Region (Biobio)", "Bio-Bio","Bío-Bío"),"Bío-Bío")) |>
+Con esta informacion, se procede a homogeneizar los datos.
+```{r homogenizar-regiones}
+cuja_regiones <- cuja_sf |>
+   dplyr::mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Los Ríos", "Los Rios", "Región de Los Ríos","Región de Los Ríos"),"Los Ríos")) |>
+  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Araucanía", "Araucania", "IX Region (AraucanÃ­a)", "La Araucania", "Región de La Araucanía","Cautin","La Araucanía"),'Araucanía')) |>
+  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Región Metropolitana de Santiago","Región Metropolitana de Santiago", "Región Metropolitana", "Metropolitana", "Santiago Metropolitan", "Santiago"), "Metropolitana")) |>
+  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Libertador General Bernardo O'Higgins", "Región del Libertador Bernardo O’Higgins", "O'Higgins", "OHiggins", "Región del Libertador General Bernardo O'Higgins","O'Higgins Region","Libertador General Bernardo O'Higgins"), "O'Higgins")) |>
+  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("VIII Region (Biobio)", "Bio-Bio","Bío-Bío","Región del Biobío"),"Bío-Bío")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Valparaíso", "Aconcagua", "V Región de Valparaíso", "Valparaiso", "Región de Valparaíso"),"Valparaíso")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Región del Maule", "Maule"), "Maule")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Osorno", "X Region (Los Lagos)", "Los Lagos","Región de Los Lagos"), "Los Lagos")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Nuble", "Ñuble"),"Nuble")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("NA", "[Not Stated]"),"NA")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Aisén del General Carlos Ibáñez del Campo", "NA"),"Aisén del General Carlos Ibáñez del Campo")) |>
+  mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Arica y Parinacota","Región de Arica y Parinacota"), "Arica y Parinacota")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Magallanes y Antártica Chilena", "Región de Magallanes y de la Antártica Chilena", "Magallanes"),"Magallanes"))
-  
-
-Regiones_unicas <- unique(Regiones$stateProvince)
-
-Regiones_unicas
 
 ```
-##Con un total de 11 regiones
+
+Luego se realiza una tabla con estos datos.
+```{r localities, echo=TRUE}
+unique(cuja_regiones$stateProvince) |>
+  kbl() |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"),fixed_thead = T) |>
+  scroll_box(width = "100%", height = "350px")
+```
+Se obtiene un total de 12 regiones.
 
   b.  ¿Cuál es la comuna de Chile que tiene mas registros?
-##Para saber cuál es la comuna con más registros, primero debemos descargar la capa de comunas.shp para Chile:
-
+  
+  R: 
+Se accede a la informacion de "comunas"
 ```{r leer-shp-bcn, echo=TRUE}
 shp='comunas.shp'
 
@@ -147,21 +166,25 @@ if ( !file.exists(shp) ){
 }
 
 comunas = read_sf("comunas.shp") |>
-#  dplyr::filter(Region == 'Región de Los Ríos') |>
   dplyr::select(Comuna, Provincia) |>
-  st_transform(crs=32719)
+    st_transform(crs=32719)
+
+# es importante manejar esa info en coordenadas "reales"
+ggplot() + 
+  geom_sf(data=comunas, alpha=.7) +
+    geom_sf(data = cuja_sf, pch=4, col="MidnightBlue") + theme_bw() +
+  ggtitle("Registros de G. cuja en GBIF")
 ```
 
-##Posteriormente, generamos la distribución de Lycalopex grieus en la capa descargada y generamos una tabla de datos agrupados por comuna: 
-
+Para poder observar la comuna con mayor cantidad de avistamiento de quique, se asocia la informacion de comunas a la data "cuja_sf", para luego observar en una tabla la cantidad de avistamientos por comuna.
 ```{r}
-Lygcomunas <- st_as_sf(Lyg_sf, coords = c("decimalLongitude", "decimalLatitude"), 
+cuja_comuna <- st_as_sf(cuja_sf, coords = c("decimalLongitude", "decimalLatitude"), 
                    crs= "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0") %>%
   st_transform(32719)
 
-comunas_transformed <- st_transform(comunas, st_crs(Lygcomunas))
+comunas_transf <- st_transform(comunas, st_crs(cuja_comuna))
 
-Tabla_agrup <- sf::st_join(Lygcomunas, comunas_transformed) %>%
+Tabla_agrup <- sf::st_join(cuja_comuna, comunas_transf) %>%
   group_by(Comuna) %>%
   summarise('Número de registros' = n()) %>%
   as.data.frame()
@@ -171,61 +194,104 @@ Tabla_agrup <- Tabla_agrup %>%
 
 Tabla_agrup
 ```
-##Obteniendo que la comuna de  Curacautín es la que acumula mayor cantidad de registros. 
 
-### Análisis de variables independientes
+Se grafican los avistamientos para visualizar la región con mayor cantidad de avistamientos.
+```{r}
+cuja_regiones %>%
+  group_by(stateProvince, year) %>%
+  count() %>%
+  ggplot(aes(x = year, y = n, color = stateProvince)) +
+  geom_line() +
+  geom_point() +
+  ylab("Número de registros") +
+  xlab("Año") +
+  ggtitle("Registros de G. cuja en GBIF por año y Región") +
+  theme(legend.position = "top")
+```
+La región de los lagos es la que tiene mayor cantidad de avistamientos.
+
+```{r mapa-ggplot, echo=TRUE}
+data("countriesHigh")
+cl <- countriesHigh |>
+  st_as_sf() |>
+  dplyr::filter(NAME=="Chile") |>
+  st_make_valid()
+
+ggplot() + 
+  geom_sf(data=cl,alpha=.4 ) +
+  geom_sf(data = cuja_sf, alpha=.3 ) +
+  ylim(st_bbox(cuja_sf)[2]-.2,st_bbox(cuja_sf)[4]+.2) +
+  xlim(st_bbox(cuja_sf)[1]-.5,st_bbox(cuja_sf)[3]+.5)
+
+```
+
+
+
+```{r time-series-by-region, echo=TRUE}
+cuja_regiones |>
+  group_by(year,stateProvince)|>
+  count() |>
+  ggplot(aes(x=year,y=n,fill=stateProvince)) +
+    geom_line() +  geom_point() +
+    ylab("Número de registros") + xlab("Año")+ 
+    ggtitle("Registros de G. cuja en GBIF  por año") +
+    facet_wrap(~stateProvince) +
+    theme(legend.position = "none")       
+```
+
 3.  Construye una base de datos (tabla), con los valores de *temperatura*, *pp* y variables bioclimáticas donde ocurre
-    tu *especie de preferencia* en Chile. (si, T y pp también!)
+    *G. cuja* en Chile. (si, T y pp también!)
+R:    
 
+Descargamos los datos:
+Precipitaciones
 ```{r}
-Bioclim <- getData("worldclim", var = "bio", res = 2.5) %>% crop(coordenadas)
-plot(Bioclim)
+cuja_climpp <- getData("worldclim", var = "prec", res = 2.5) |>
+    crop(cuja_sf)
 
+plot(cuja_climpp)
 ```
 
+Temperatura
 ```{r}
-set.seed(123)
-Bioclim_data <- matrix(runif(100), ncol = 10)
+cuja_climtemp <- getData("worldclim", var = "tmean", res = 2.5) |>
+    crop(cuja_sf)
 
-Lyc_sft <- data.frame(
-  decimalLongitude = runif(10, -80, -70),
-  decimalLatitude = runif(10, -20, -10)
-)
-
-temperature <- runif(10, 10, 30)
-precipitation <- runif(10, 100, 500)
-
-BioclimWorldclim <- Bioclim_data
-
-if (length(BioclimWorldclim) > 0) {
-  
-  selected_layers <- c(1, 2, 3, 4, 5, 6, 7, 8, 9, 10) 
-  Bioclim_selected <- BioclimWorldclim[, selected_layers]
-  
-  Bioclim_df <- cbind(Lyg_sf, Bioclim_selected)
-  names(Bioclim_df)[3:7] <- paste0("Bioclim_", selected_layers)
-  
-  Bioclim_df <- cbind(Bioclim_df, temperature, precipitation)
-  
-  head(Bioclim_df)
-  Bioclim_df
-}
+plot(cuja_climtemp)
 ```
 
+Bioclimaticos
+```{r}
+cuja_bioclim <- getData("worldclim", var = "bio", res = 2.5) |>
+    crop(cuja_sf)
 
-4.  Describe estadisticamente el espacio bioclimático en que ocurre tu *especie de preferencia*
+plot(cuja_bioclim)
+```
+
+Generamos la tabla
+```{r tabla-datos-bioclimaticos, echo=TRUE}
+cuja_clim <- raster::extract(, cuja_sf) |>
+    as.data.frame()
+
+kable(cuja_clim) |> 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  scroll_box(width = "100%", height = "400px")
+```
+
+4.  Describe estadisticamente el espacio bioclimático en que ocurre *G. cuja*
   a.  Rango de T y PP, promedio, moda, desviaciones...
+R:
 
-### Análisis temporal
-5.  Construye una serie de tiempo con el número de registros de tu *especie de preferencia*
+5.  Construye una serie de tiempo con el número de registros de *G. cuja*
   a.  ¿Puedes decir cual es la comuna (o región) que ha tenido el registro mas continuo de esta especie? i. Antes de
     hacer, diseña un algoritmo para producir dichos datos.
+R:
 
-### Análisis de distribución
-6.  Usa un modelo estadístico que explique la distribución del número de registros de tu *especie de preferencia* por
+6.  Usa un modelo estadístico que explique la distribución del número de registros de tu *G. cuja* por
     comuna
   a.  ¿Cuál(es) es(son) la(s) variable(s) independe(s) que mejor se asocian con la presencia de tu *especie de
     preferencia*?
+R:
 
 ### Predicción
 7.  Indica cual es la predicción para la distribución de tu *especie de preferencia* en las comunas de
@@ -235,11 +301,10 @@ if (length(BioclimWorldclim) > 0) {
   -   Maullín
   -   Rio Hualaihué
   -   Puerto Natales
-
 ¿Cuántos registros se espera en cada una de estas comunas?
 
 8.  Haz un mapa de distribución patra tu *especie de preferencia* en todo Chile.
-
 9.  Discute tus resultados desde las siguientes perspectivas:
   a.  Técnicas la construcción del modelo elegido
-  b.  Biológica y de conservación de tu *especie de preferencia*.
+  b.  Biológica y de conservación de tu *especie de preferencia
+  
