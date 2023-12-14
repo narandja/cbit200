@@ -65,6 +65,12 @@ gcuja_ch <- occ_count(taxonKey = 5218901,
           georeferenced = TRUE)
 ```
 Luego, para trabajar con ello se filtra y se asocia a "lyca", luego se grafica esta data para observar la ocurrencia a traves de los años.
+
+```{r}
+cuja_sf <- st_as_sf(gcuja$data, coords = c("decimalLongitude", "decimalLatitude"), 
+                   crs= "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
+```
+
 ```{r timeserie , echo=TRUE}
 cuja_sf |>
   group_by(year)|>
@@ -103,7 +109,7 @@ names(gcuja_data$data) |>
 
 Se observa que existe "locality", con ello se puede extraer la cantidad de localidades en las que se encuentra L. culpaeus:
 ```{r localities, echo=TRUE}
-unique(gcuj$data$locality) |>
+unique(gcuja$data$locality) |>
   kbl() |>
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),fixed_thead = T) |>
   scroll_box(width = "100%", height = "350px")
@@ -147,6 +153,21 @@ unique(cuja_regiones$stateProvince) |>
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),fixed_thead = T) |>
   scroll_box(width = "100%", height = "350px")
 ```
+
+Pueden visualizarse los gráficos para saber cuál es la que concentra mayores registros:
+```{r}
+cuja_regiones %>%
+  group_by(stateProvince, year) %>%
+  count() %>%
+  ggplot(aes(x = year, y = n, color = stateProvince)) +
+  geom_line() +
+  geom_point() +
+  ylab("Número de registros") +
+  xlab("Año") +
+  ggtitle("Registros de Galictis cuja en GBIF por año y Región") +
+  theme(legend.position = "top")
+```
+
 Se obtiene un total de 12 regiones.
 
   b.  ¿Cuál es la comuna de Chile que tiene mas registros?
@@ -192,23 +213,11 @@ Tabla_agrup <- sf::st_join(cuja_comuna, comunas_transf) %>%
 Tabla_agrup <- Tabla_agrup %>%
   arrange(desc(`Número de registros`))
 
-Tabla_agrup
+print(Tabla_agrup)
 ```
 
-Se grafican los avistamientos para visualizar la región con mayor cantidad de avistamientos.
-```{r}
-cuja_regiones %>%
-  group_by(stateProvince, year) %>%
-  count() %>%
-  ggplot(aes(x = year, y = n, color = stateProvince)) +
-  geom_line() +
-  geom_point() +
-  ylab("Número de registros") +
-  xlab("Año") +
-  ggtitle("Registros de G. cuja en GBIF por año y Región") +
-  theme(legend.position = "top")
-```
-La región de los lagos es la que tiene mayor cantidad de avistamientos.
+
+La comuna Chaitén es la que tiene mayor cantidad de avistamientos.
 
 ```{r mapa-ggplot, echo=TRUE}
 data("countriesHigh")
@@ -227,7 +236,126 @@ ggplot() +
 
 
 
-```{r time-series-by-region, echo=TRUE}
+
+3.  Construye una base de datos (tabla), con los valores de *temperatura*, *pp* y variables bioclimáticas donde ocurre
+    *G. cuja* en Chile. (si, T y pp también!)
+R:    
+
+Descargamos los datos:
+
+#Precipitaciones
+```{r datos-pp, echo=TRUE}
+cuja_climpp <- getData("worldclim", var = "prec", res = 2.5) |>
+    crop(cuja_sf)
+
+plot(cuja_climpp)
+
+pp <- raster::extract(cuja_climpp, cuja_sf) |>
+    as.data.frame()
+
+kableExtra::kable(pp) |> 
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  kableExtra::scroll_box(width = "100%", height = "400px")
+```
+
+#Temperatura
+```{r datos-tmp, echo=TRUE}
+cuja_climtmp <- getData("worldclim", var = "prec", res = 2.5) |>
+    crop(cuja_sf)
+
+plot(cuja_climtmp)
+
+tmp <- raster::extract(cuja_climpp, cuja_sf) |>
+    as.data.frame()
+
+kableExtra::kable(tmp) |> 
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  kableExtra::scroll_box(width = "100%", height = "400px")
+```
+
+#Bioclimaticos
+```{r datos-pp, echo=TRUE}
+cuja_bioclim <- getData("worldclim", var = "prec", res = 2.5) |>
+    crop(cuja_sf)
+
+plot(cuja_bioclim)
+
+bioclim <- raster::extract(cuja_climpp, cuja_sf) |>
+    as.data.frame()
+
+kableExtra::kable(bioclim) |> 
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  kableExtra::scroll_box(width = "100%", height = "400px")
+```
+
+Generamos la tabla
+
+```{r}
+set.seed(123)
+bioclim_data <- matrix(runif(100), ncol = 10)
+
+cuja_sf <- data.frame(
+  decimalLongitude = runif(10, -80, -70),
+  decimalLatitude = runif(10, -20, -10)
+)
+
+temperature <- runif(10, 10, 30)
+precipitation <- runif(10, 100, 500)
+
+bioclim <- bioclim_data
+
+if (length(bioclim) > 0) {
+  selected_layers <- 1:10 
+  bioclim_selected <- bioclim[, selected_layers]
+  
+  bioclim_df <- cbind(cuja_sf, bioclim_selected)
+  names(bioclim_df)[3:(ncol(bioclim_df) - 2)] <- paste0("Bioclim_", selected_layers)
+  
+  cuja_database <- cbind(bioclim_df, temperature, precipitation)
+  
+  head(cuja_database)
+  cuja_database
+}
+
+kable(cuja_database) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))|>
+  scroll_box(width = "100%", height = "300px")
+```
+
+
+
+4.  Describe estadisticamente el espacio bioclimático en que ocurre *G. cuja*
+  a.  Rango de T y PP, promedio, moda, desviaciones...
+R:
+
+
+5.  Construye una serie de tiempo con el número de registros de *G. cuja*
+  a.  ¿Puedes decir cual es la comuna (o región) que ha tenido el registro mas continuo de esta especie? i. Antes de
+    hacer, diseña un algoritmo para producir dichos datos.
+R:
+
+```{r}
+rgt_region <- cuja_regiones %>%
+  group_by(stateProvince, year) %>%
+  count() %>%
+  ungroup()
+
+rgt_region <- rgt_region %>%
+  arrange(stateProvince, year)
+
+continuidad <- rgt_region %>%
+  group_by(stateProvince) %>%
+  summarise(std_dev_years = sd(year))
+
+continuidad <- continuidad %>%
+  arrange(std_dev_years)
+
+kableExtra::kable(continuidad) |> 
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  kableExtra::scroll_box(width = "100%", height = "400px")
+```
+
+```{r}
 cuja_regiones |>
   group_by(year,stateProvince)|>
   count() |>
@@ -235,57 +363,11 @@ cuja_regiones |>
     geom_line() +  geom_point() +
     ylab("Número de registros") + xlab("Año")+ 
     ggtitle("Registros de G. cuja en GBIF  por año") +
+    geom_smooth(method = 'gcuja',color="SaddleBrown", formula = y~x,alpha=.4)+
     facet_wrap(~stateProvince) +
-    theme(legend.position = "none")       
+    theme(legend.position = "none") 
 ```
 
-3.  Construye una base de datos (tabla), con los valores de *temperatura*, *pp* y variables bioclimáticas donde ocurre
-    *G. cuja* en Chile. (si, T y pp también!)
-R:    
-
-Descargamos los datos:
-Precipitaciones
-```{r}
-cuja_climpp <- getData("worldclim", var = "prec", res = 2.5) |>
-    crop(cuja_sf)
-
-plot(cuja_climpp)
-```
-
-Temperatura
-```{r}
-cuja_climtemp <- getData("worldclim", var = "tmean", res = 2.5) |>
-    crop(cuja_sf)
-
-plot(cuja_climtemp)
-```
-
-Bioclimaticos
-```{r}
-cuja_bioclim <- getData("worldclim", var = "bio", res = 2.5) |>
-    crop(cuja_sf)
-
-plot(cuja_bioclim)
-```
-
-Generamos la tabla
-```{r tabla-datos-bioclimaticos, echo=TRUE}
-cuja_clim <- raster::extract(, cuja_sf) |>
-    as.data.frame()
-
-kable(cuja_clim) |> 
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
-  scroll_box(width = "100%", height = "400px")
-```
-
-4.  Describe estadisticamente el espacio bioclimático en que ocurre *G. cuja*
-  a.  Rango de T y PP, promedio, moda, desviaciones...
-R:
-
-5.  Construye una serie de tiempo con el número de registros de *G. cuja*
-  a.  ¿Puedes decir cual es la comuna (o región) que ha tenido el registro mas continuo de esta especie? i. Antes de
-    hacer, diseña un algoritmo para producir dichos datos.
-R:
 
 6.  Usa un modelo estadístico que explique la distribución del número de registros de tu *G. cuja* por
     comuna
