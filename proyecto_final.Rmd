@@ -3,6 +3,9 @@ title: "proyecto_semestral"
 author: "Nadja Aranda"
 date: "2023-12-11"
 output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
 ---
 
 ```{r}
@@ -15,7 +18,7 @@ output: html_document
 #install.packages("kableExtra")
 ```
 
-```{r setup, include=FALSE}
+```{r}
 knitr::opts_chunk$set(echo = TRUE)
 library(rgbif)
 library(rworldxtra)
@@ -27,109 +30,148 @@ library(kableExtra)
 library(pacman)
 ```
 
+Ecoinformática y modelos de distribucion de especies.
+
+```{r}
+knitr::opts_chunk$set(
+	echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+	cache = TRUE,
+	tidy = TRUE,
+	tidy.opts = list(blank = FALSE, width.cutoff = 80)
+)
+
+require(pacman)
+pacman::p_load(rgbif,rworldxtra,sf , terra, ggplot2,tidyverse, 
+               kableExtra, mapview, curl)
+options("kableExtra.html.bsTable" = T)
+```
 
 #Total de registros de peresencia en GBIF
+
 ```{r}
 occ_count()
 ```
 
 #Cantidad de registros georreferenciados en Chile
+
 ```{r}
 cl_isocode <- isocodes[grep("Chile", isocodes$name),"code"]
 occ_count(country=cl_isocode, georeferenced = TRUE)
 ```
 
-1.  Describir los datos de ocurrencia de *Galictis cuja* en base de datos [GBIF](http://www.gbif.org)
-  a.  ¿Cuántos registros totales existen? y ¿En cuántas localidades únicas?
-  
-  R:  
+1.  Describir los datos de ocurrencia de *Galictis cuja* en base de
+    datos [GBIF](http://www.gbif.org)
+a.  ¿Cuántos registros totales existen? y ¿En cuántas localidades
+    únicas?
 
-Busquemos para Quique en Chile georreferenciados, obtención del código del taxon
-```{r}
+R:
+Se establecen la información de la difivisión territorial de Chile,
+division de país y regiones.
+
+```{r ej-gbif-chile, echo=TRUE, warning=FALSE}
+cl_isocode <- isocodes[grep("Chile", isocodes$name), "code"]
+```
+
+Se busca el codigo correspondiente a Galictis cuja - Quique, esto
+evita problemas como puede ser por el cambio de nombre de la especie,
+esto se asocia a "name".
+
+```{r gcuja-chile, echo=TRUE}
 name <- name_backbone(name = "Galictis cuja", rank = "species")
 name[, c("usageKey", "scientificName")]
 ```
-Nos entrega 2434870 Lycalopex culpaeus (Molina, 1782)
 
-contamos
+Entrega el codigo: 5218901 para Galictis cuja (Molina, 1782).
+
+Se observa la cantidad de datos georeferenciados en Chile, se obtiene 
+
 ```{r}
-gcuja<- occ_search(scientificName = "Galictis cuja", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 500)
-
-occ_search(scientificName = "Galictis cuja", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 500)
+occ_count(country=cl_isocode, georeferenced = TRUE)
 ```
-Me entrega [1] 386  significa que hay 386 datos georeferenciados asociados a esto
-Se filtra el conteo total de avistamientos del chungungo para CL, Chile, se asocia a "gcuja_ch"
-```{r gcuja_ch, echo=TRUE, warning=FALSE}
+
+Se filtra el conteo total de ocurrencias del chungungo para CL, Chile,
+se asocia a "chun_ch"
+
+```{r chun_ch, echo=TRUE, warning=FALSE}
 gcuja_ch <- occ_count(taxonKey = 5218901, 
           country = 'CL',
           georeferenced = TRUE)
 ```
-Luego, para trabajar con ello se filtra y se asocia a "lyca", luego se grafica esta data para observar la ocurrencia a traves de los años.
+
+Existe un total de 9 avistamientos.
+
+Luego, para trabajar con ello se filtra y se asocia a "gc", luego se
+grafica esta data para observar la ocurrencia a traves de los años.
 
 ```{r}
-cuja_sf <- st_as_sf(gcuja$data, coords = c("decimalLongitude", "decimalLatitude"), 
-                   crs= "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
-```
+gc <- occ_data(
+  scientificName = 'Galictis cuja', 
+  country = 'CL', 
+  hasCoordinate = TRUE, 
+  hasGeospatialIssue = FALSE
+  )
 
-```{r timeserie , echo=TRUE}
-cuja_sf |>
+gc$data |>
   group_by(year)|>
-  count() |>
-  ggplot(aes(x=year,y=n)) +
-    geom_line(color='MidnightBlue') +  geom_point() +
-    ylab("Número de registros") + xlab("Año")+ 
-    ggtitle("Registros de G. cuja en GBIF  por año") +
-    geom_smooth(method = 'gcuja',color="SaddleBrown", formula = y~x,alpha=.4)
+  count()|>
+  ggplot(aes(x=year, y=n)) + geom_line() + geom_point()
 
 ```
 
-  b.  ¿Qué otros datos pueden asociarse a dichos registros? (bonus, no lo vimos en clase!)
-  
-  R: 
+b.  ¿Qué otros datos pueden asociarse a dichos registros? (bonus, no lo
+    vimos en clase!)
 
+R:
 
 2.  Hacer un mapa de la distribución de *G. cuja* para Chile
-  a.  ¿En cuántas Regiones encontramos a esta expecie?
-  
-  R:
-#Utilizamos occ_search occ_search nos da un resumen de resultados como los del paquete dplyr de Tidyverse, mientras que occ_data está optimizada para ser más eficiente.
+a.  ¿En cuántas Regiones encontramos a esta expecie?
+
+R:
+
+Para ver la lista completa se ven los nombres de columnas con `names()`:
+
 ```{r}
-gcuja_data<- occ_search(scientificName = "Galictis cuja", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 500)
-
-occ_search(scientificName = "Galictis cuja", country = "CL", hasCoordinate = TRUE, hasGeospatialIssue = FALSE, limit = 500)
-```
-
-Podemos ver los datos en tabla donde se ven los nombres de columnas con `names()`:
-```{r cols-cuja-gbif-chile, echo=TRUE}
-names(gcuja_data$data) |>
+names(gc$data) |>
   kbl() |>
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),fixed_thead = T) |>
   scroll_box(width = "100%", height = "350px")
 ```
 
-Se observa que existe "locality", con ello se puede extraer la cantidad de localidades en las que se encuentra L. culpaeus:
-```{r localities, echo=TRUE}
-unique(gcuja$data$locality) |>
+Se observa que existe "locality", con ello se puede extraer la cantidad
+de localidades en las que se encuentra Lontra felina:
+
+```{r, echo=TRUE}
+unique(gc$data$locality) |>
   kbl() |>
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),fixed_thead = T) |>
   scroll_box(width = "100%", height = "350px")
 ```
+
 Se observa un total de 24 localidades, contando como 1 a "NA".
 
 Se asocian los datos con coordenadas a un shapefile.
-```{r cuja-sf, echo=TRUE}
-cuja_sf <- st_as_sf(gcuja_data$data, coords = c("decimalLongitude", "decimalLatitude"), 
+
+```{r}
+gcuja_sf <- st_as_sf(gc$data, coords = c("decimalLongitude", "decimalLatitude"), 
                    crs= "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0")
 ```
 
-Para poder obtener la cantidad de regiones con avistamientos primero se debe reorganizar la informacion, uniendo los nombres que aludan a lo mismo pero escritos distinto, para ello se visualiza a cuales corresponden estos:
+Para poder obtener la cantidad de regiones con ocurrencia primero se
+debe reorganizar la informacion, uniendo los nombres que aludan a lo
+mismo pero escritos distinto, para ello se visualiza a cuales
+corresponden estos:
+
 ```{r}
-unique(cuja_sf$stateProvince)
+unique(gcuja_sf$stateProvince)
 ```
 
 Con esta informacion, se procede a homogeneizar los datos.
+
 ```{r homogenizar-regiones}
-cuja_regiones <- cuja_sf |>
+# primero, homogeneizamos los nombres de las regiones
+gcuja_sf2 <- gcuja_sf |>
    dplyr::mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Los Ríos", "Los Rios", "Región de Los Ríos","Región de Los Ríos"),"Los Ríos")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Araucanía", "Araucania", "IX Region (AraucanÃ­a)", "La Araucania", "Región de La Araucanía","Cautin","La Araucanía"),'Araucanía')) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Región Metropolitana de Santiago","Región Metropolitana de Santiago", "Región Metropolitana", "Metropolitana", "Santiago Metropolitan", "Santiago"), "Metropolitana")) |>
@@ -143,20 +185,24 @@ cuja_regiones <- cuja_sf |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Aisén del General Carlos Ibáñez del Campo", "NA"),"Aisén del General Carlos Ibáñez del Campo")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Arica y Parinacota","Región de Arica y Parinacota"), "Arica y Parinacota")) |>
   mutate(stateProvince = replace(stateProvince, stateProvince %in% c("Magallanes y Antártica Chilena", "Región de Magallanes y de la Antártica Chilena", "Magallanes"),"Magallanes"))
-
 ```
 
 Luego se realiza una tabla con estos datos.
-```{r localities, echo=TRUE}
-unique(cuja_regiones$stateProvince) |>
+
+```{r}
+unique(gcuja_sf2$stateProvince) |>
   kbl() |>
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"),fixed_thead = T) |>
   scroll_box(width = "100%", height = "350px")
 ```
 
-Pueden visualizarse los gráficos para saber cuál es la que concentra mayores registros:
+Se obtiene un total de 12 regiones.
+
+Pueden visualizarse los gráficos para saber cuál es la que concentra
+mayores registros:
+
 ```{r}
-cuja_regiones %>%
+gcuja_sf2 %>%
   group_by(stateProvince, year) %>%
   count() %>%
   ggplot(aes(x = year, y = n, color = stateProvince)) +
@@ -168,12 +214,11 @@ cuja_regiones %>%
   theme(legend.position = "top")
 ```
 
-Se obtiene un total de 12 regiones.
+b.  ¿Cuál es la comuna de Chile que tiene mas registros?
 
-  b.  ¿Cuál es la comuna de Chile que tiene mas registros?
-  
-  R: 
-Se accede a la informacion de "comunas"
+R:
+Primero se accede a la informacion de "comunas".
+
 ```{r leer-shp-bcn, echo=TRUE}
 shp='comunas.shp'
 
@@ -188,24 +233,19 @@ if ( !file.exists(shp) ){
 
 comunas = read_sf("comunas.shp") |>
   dplyr::select(Comuna, Provincia) |>
-    st_transform(crs=32719)
-
-# es importante manejar esa info en coordenadas "reales"
-ggplot() + 
-  geom_sf(data=comunas, alpha=.7) +
-    geom_sf(data = cuja_sf, pch=4, col="MidnightBlue") + theme_bw() +
-  ggtitle("Registros de G. cuja en GBIF")
+    st_transform(crs=32719) # es importante manejar esa info en coordenadas "reales"
 ```
 
-Para poder observar la comuna con mayor cantidad de avistamiento de quique, se asocia la informacion de comunas a la data "cuja_sf", para luego observar en una tabla la cantidad de avistamientos por comuna.
+Para poder observar la comuna con mayor cantidad de avistamiento de G. cuja, se asocia la informacion de comunas a la data "gcuja_sf", para luego observar en una tabla la cantidad de avistamientos por comuna.
+
 ```{r}
-cuja_comuna <- st_as_sf(cuja_sf, coords = c("decimalLongitude", "decimalLatitude"), 
+gcujacomuna <- st_as_sf(gcuja_sf2, coords = c("decimalLongitude", "decimalLatitude"), 
                    crs= "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0") %>%
   st_transform(32719)
 
-comunas_transf <- st_transform(comunas, st_crs(cuja_comuna))
+comunas_trans <- st_transform(comunas, st_crs(gcujacomuna))
 
-Tabla_agrup <- sf::st_join(cuja_comuna, comunas_transf) %>%
+Tabla_agrup <- sf::st_join(gcujacomuna, comunas_trans) %>%
   group_by(Comuna) %>%
   summarise('Número de registros' = n()) %>%
   as.data.frame()
@@ -213,13 +253,41 @@ Tabla_agrup <- sf::st_join(cuja_comuna, comunas_transf) %>%
 Tabla_agrup <- Tabla_agrup %>%
   arrange(desc(`Número de registros`))
 
-print(Tabla_agrup)
+Tabla_agrup
 ```
 
+Se obtiene que la comuna con mayor ocurrencia es Chaiten con 50 registros
 
-La comuna Chaitén es la que tiene mayor cantidad de avistamientos.
+Se observa en mapView la ocurrencia pero asociada a las Regiones:
 
-```{r mapa-ggplot, echo=TRUE}
+```{r}
+mapview(gcujacomuna, zcol="stateProvince")
+```
+En ella se observa que la mayor ocurrencia se presenta en la región de Araucania.
+
+Para ver esto en una tabala se seleccionan los datos de "gcuja_sf2" y se suma la cantidad de ocurrencias por región para luego ordenarlas de manera descendente. Aqui dice que la Metropolitana es la region con mayor ocurrencias.
+
+```{r}
+ocurr_reg <- gcuja_sf2 %>%
+  group_by(stateProvince) %>%
+  summarise(ocurrencias = n()) %>%
+  arrange(desc(ocurrencias))
+
+kable(ocurr_reg)
+```
+
+Vista de las ocurrencias por comuna en el mapa, primero se trabaja con un shapefiles de la Biblioteca Nacional que se utiliza como mapa base por sus divisiones territoriales por comuna.
+
+```{r}
+ggplot() + 
+  geom_sf(data=comunas, alpha=.7) +
+    geom_sf(data = gcuja_sf, pch=4, col="MidnightBlue") + theme_bw() +
+  ggtitle("Registros de G. cuja en GBIF")
+```
+
+Otra opcion sin la base de datos anterior, es esta, pero no tiene las divisiones por comuna. Este mapa esta acotado a los datos de ocurrencia.
+
+```{r, echo=TRUE}
 data("countriesHigh")
 cl <- countriesHigh |>
   st_as_sf() |>
@@ -228,135 +296,215 @@ cl <- countriesHigh |>
 
 ggplot() + 
   geom_sf(data=cl,alpha=.4 ) +
-  geom_sf(data = cuja_sf, alpha=.3 ) +
-  ylim(st_bbox(cuja_sf)[2]-.2,st_bbox(cuja_sf)[4]+.2) +
-  xlim(st_bbox(cuja_sf)[1]-.5,st_bbox(cuja_sf)[3]+.5)
+  geom_sf(data = gcuja_sf2, alpha=.3 ) +
+  ylim(st_bbox(gcuja_sf2)[2]-.2,st_bbox(gcuja_sf2)[4]+.2) +
+  xlim(st_bbox(gcuja_sf2)[1]-.5,st_bbox(gcuja_sf2)[3]+.5)
+```
+Se realiza un grafico de tendencia de la ocurrencia de G. cuja, se observa la tendencia al aumento.
+
+```{r, echo=TRUE}
+gcuja_sf2 |>
+  group_by(year)|>
+  count() |>
+  ggplot(aes(x=year,y=n)) +
+    geom_line(color='MidnightBlue') +  geom_point() +
+    ylab("Número de registros") + xlab("Año")+ 
+    ggtitle("Registros de G. cuja en GBIF  por año") +
+    geom_smooth(method = 'lm',color="SaddleBrown", formula = y~x,alpha=.4)
 
 ```
 
+3.  Construye una base de datos (tabla), con los valores de
+    *temperatura*, *pp* y variables bioclimáticas donde ocurre *G. cuja*
+    en Chile. (si, T y pp también!) R:
 
+##Datos climaticos
 
+```{r, echo=TRUE}
+bioclim <- getData("worldclim", var = "bio", res = 2.5) |>
+    crop(gcuja_sf2)
 
-3.  Construye una base de datos (tabla), con los valores de *temperatura*, *pp* y variables bioclimáticas donde ocurre
-    *G. cuja* en Chile. (si, T y pp también!)
-R:    
+plot(bioclim)
+```
 
-Descargamos los datos:
+Se extraen los datos bioclimáticos en coordenadas donde esta el quique, luego se asocia a los pixeles en un raster por medio de la
+funcion extract(), con esto se genera una tabla con las variables climaticas para cada una de las coordenadas
 
-#Precipitaciones
-```{r datos-pp, echo=TRUE}
-cuja_climpp <- getData("worldclim", var = "prec", res = 2.5) |>
-    crop(cuja_sf)
-
-plot(cuja_climpp)
-
-pp <- raster::extract(cuja_climpp, cuja_sf) |>
+```{r, echo=TRUE}
+clime <- raster::extract(bioclim, gcuja_sf2) |>
     as.data.frame()
 
-kableExtra::kable(pp) |> 
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
-  kableExtra::scroll_box(width = "100%", height = "400px")
+kable(clime) |> 
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  scroll_box(width = "100%", height = "400px")
 ```
 
-#Temperatura
-```{r datos-tmp, echo=TRUE}
-cuja_climtmp <- getData("worldclim", var = "prec", res = 2.5) |>
-    crop(cuja_sf)
+Se unen los datos de clima a la tabla de datos gcuja_sf2, bajo el nombre "gc2".
 
-plot(cuja_climtmp)
+```{r, echo=TRUE}
+gc2 <- gcuja_sf2 |>
+  bind_cols(clime)
 
-tmp <- raster::extract(cuja_climpp, cuja_sf) |>
-    as.data.frame()
 
-kableExtra::kable(tmp) |> 
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
-  kableExtra::scroll_box(width = "100%", height = "400px")
-```
-
-#Bioclimaticos
-```{r datos-pp, echo=TRUE}
-cuja_bioclim <- getData("worldclim", var = "prec", res = 2.5) |>
-    crop(cuja_sf)
-
-plot(cuja_bioclim)
-
-bioclim <- raster::extract(cuja_climpp, cuja_sf) |>
-    as.data.frame()
-
-kableExtra::kable(bioclim) |> 
-  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
-  kableExtra::scroll_box(width = "100%", height = "400px")
-```
-
-Generamos la tabla
-
-```{r}
-set.seed(123)
-bioclim_data <- matrix(runif(100), ncol = 10)
-
-cuja_sf <- data.frame(
-  decimalLongitude = runif(10, -80, -70),
-  decimalLatitude = runif(10, -20, -10)
-)
-
-temperature <- runif(10, 10, 30)
-precipitation <- runif(10, 100, 500)
-
-bioclim <- bioclim_data
-
-if (length(bioclim) > 0) {
-  selected_layers <- 1:10 
-  bioclim_selected <- bioclim[, selected_layers]
-  
-  bioclim_df <- cbind(cuja_sf, bioclim_selected)
-  names(bioclim_df)[3:(ncol(bioclim_df) - 2)] <- paste0("Bioclim_", selected_layers)
-  
-  cuja_database <- cbind(bioclim_df, temperature, precipitation)
-  
-  head(cuja_database)
-  cuja_database
-}
-
-kable(cuja_database) |>
+kable(gc2) |>
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"))|>
-  scroll_box(width = "100%", height = "300px")
+  scroll_box(width = "100%", height = "400px")
 ```
 
-
-
-4.  Describe estadisticamente el espacio bioclimático en que ocurre *G. cuja*
-  a.  Rango de T y PP, promedio, moda, desviaciones...
-R:
-
-
-5.  Construye una serie de tiempo con el número de registros de *G. cuja*
-  a.  ¿Puedes decir cual es la comuna (o región) que ha tenido el registro mas continuo de esta especie? i. Antes de
-    hacer, diseña un algoritmo para producir dichos datos.
-R:
+Se extraen los datos de precipitaciones.
 
 ```{r}
-rgt_region <- cuja_regiones %>%
+pp <- getData ("worldclim", var = "prec", res = 2.5)|>
+  crop(gcuja_sf2)
+plot(pp)
+```
+
+Se extraen los datos de temperatura media.
+
+```{r}
+tmp <- getData ("worldclim", var = "tmean", res = 2.5)|>
+  crop(gcuja_sf2)
+plot(tmp)
+```
+
+Se relacionan los datos espaciales de precipitaciones "pp", con los datos de la especie.
+
+```{r, echo=TRUE}
+gc2pp <- raster::extract(pp, gcuja_sf2) |>
+    as.data.frame()
+
+kableExtra::kable(gc2pp) |> 
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  kableExtra::scroll_box(width = "100%", height = "400px")
+```
+
+Se relacionan los datos espaciales de temperatura "tmp", con los datos de G. cuja
+
+```{r, echo=TRUE}
+gc2tmp <- raster::extract(tmp, gcuja_sf2) |>
+    as.data.frame()
+
+kableExtra::kable(gc2tmp) |> 
+  kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
+  kableExtra::scroll_box(width = "100%", height = "400px")
+```
+
+Aparentemente a los datos les falta una coma por lo que se aplica una funcion para dividir por 10.
+
+```{r}
+col_tmp <- grep("^tmean", names(gc2tmp), value = TRUE)
+
+gc2tmpC <- lapply(gc2tmp[col_tmp], function(x) (x) / 10)
+
+gcj2tmpC <- data.frame(gc2tmp)
+```
+
+Se unen los datos bioclimaticos, datos de precipitaciones y temperatura media a los datos del quique, se denomina "gcuja_climall".
+
+```{r juntar-datos, echo=TRUE}
+gcuja_climall <- gcuja_sf2 |>
+  bind_cols(clime, gc2pp, gcj2tmpC)
+
+
+kable(gcuja_climall) |>
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))|>
+  scroll_box(width = "100%", height = "400px")
+```
+
+4.  Describe estadisticamente el espacio bioclimático en que ocurre *G.
+    cuja*
+a.  Rango de T y PP, promedio, moda, desviaciones... R:
+
+Para obtener los datos estadisticos se extrae la media moda y desviacion estandar, también los rangos de minimo y maximo. Luego se asocia esta data a "summary_estads" y se visualiza.
+
+```{r}
+#media, moda y desviación estándar para las columnas completas
+media_t <- mean(gcuja_climall$tmean, na.rm = TRUE)
+moda_t <- names(sort(table(gcuja_climall$tmean), decreasing = TRUE))[1]
+desv_t <- sd(gcuja_climall$tmean, na.rm = TRUE)
+
+media_pp <- mean(gcuja_climall$prec, na.rm = TRUE)
+moda_pp <- names(sort(table(gcuja_climall$prec), decreasing = TRUE))[1]
+desv_pp <- sd(gcuja_climall$prec, na.rm = TRUE)
+
+#rango, máximo y mínimo para tmean y prec
+rango_tmean <- range(gcuja_climall$tmean, na.rm = TRUE)
+min_tmean <- min(gcuja_climall$tmean, na.rm = TRUE)
+max_tmean <- max(gcuja_climall$tmean, na.rm = TRUE)
+
+rango_prec <- range(gcuja_climall$prec, na.rm = TRUE)
+min_prec <- min(gcuja_climall$prec, na.rm = TRUE)
+max_prec <- max(gcuja_climall$prec, na.rm = TRUE)
+
+# Resumen de estadísticas para las columnas específicas
+summary_estads <- summary(gcuja_climall[, c("tmean1",  "tmean2", "tmean3", "tmean4", "tmean5", "tmean6", "tmean7", "tmean8", "tmean9", "tmean10", "tmean11",  "tmean12", "prec1", "prec2",  "prec3", "prec4", "prec5", "prec6", "prec7", "prec8", "prec9", "prec10", "prec11", "prec12")])
+media_t <- mean(gcuja_climall$tmean , na.rm = TRUE)
+moda_t <- names(sort(table(gcuja_climall$tmean), decreasing = TRUE))[1]
+sd_t <- sd(gcuja_climall$tmean, na.rm = TRUE)
+
+media_pp <- mean(gcuja_climall$prec, na.rm = TRUE)
+moda_pp <- names(sort(table(gcuja_climall$prec), decreasing = TRUE))[1]
+sd_pp <- sd(gcuja_climall$prec, na.rm = TRUE)
+
+names(summary_estads) <- c("Mínimo", "Desv. min.", "Mediana", "Media", "Desv. max.", "Máximo")
+
+print(summary_estads)
+```
+
+Se observa la correlación entre las variable climaticas.
+
+```{r tabla-correlaciones-bioclimaticas, echo=TRUE}
+corr <- cor(clime,use = "pairwise")
+ggcorrplot::ggcorrplot(corr,method='circle',pch=2,show.diag = FALSE,type="upper",
+           ggtheme = theme_minimal(),hc.order = TRUE)
+```
+
+Se seleccionan las varibles climaticas con menor correclación, se les asigna un nombre "bioclim2". Luego a estos datos se les asocia coordenadas y se nombra "clime2".
+
+Las variable seleccionadas son: -Bio2: Rango medio diurno (media mensual(temperatura máxima - temperatura mínima)) -Bio3: Isotermia (BIO2/BIO7)(×100) -Bio4: Estacionalidad de la temperatura (desviación estándar×100) -Bio7: Rango Anual de Temperatura (BIO5-BIO6) -Bio15:
+Estacionalidad de las precipitaciones (coeficiente de variación)
+
+```{r, echo=TRUE}
+bioclim2 <- bioclim[[c("bio2","bio3","bio4","bio7","bio15")]]
+
+clime2 <- raster::extract(bioclim2, gcuja_sf2) |>
+    as.data.frame()
+```
+
+5.  Construye una serie de tiempo con el número de registros de *G.
+    cuja*
+
+a.  ¿Puedes decir cual es la comuna (o región) que ha tenido el registro
+    mas continuo de esta especie? i. Antes de hacer, diseña un algoritmo
+    para producir dichos datos.
+
+R:
+Finalmente, se visualiza la desviacion estandar por región para evaluar la continuidad, se observa que la región del Maule presenta la mayor continuidad de datos con la menor desviación estandar de 1,015.
+
+```{r}
+gcuja_region <- gcuja_sf2 %>%
   group_by(stateProvince, year) %>%
   count() %>%
   ungroup()
 
-rgt_region <- rgt_region %>%
+gcuja_region <- gcuja_sf2 %>%
   arrange(stateProvince, year)
 
-continuidad <- rgt_region %>%
+conti <- gcuja_sf2 %>%
   group_by(stateProvince) %>%
   summarise(std_dev_years = sd(year))
 
-continuidad <- continuidad %>%
+contin <- conti %>%
   arrange(std_dev_years)
 
-kableExtra::kable(continuidad) |> 
+kableExtra::kable(contin) |> 
   kableExtra::kable_styling(bootstrap_options = c("striped", "hover", "condensed")) |>
   kableExtra::scroll_box(width = "100%", height = "400px")
 ```
 
+
 ```{r}
-cuja_regiones |>
+gcuja_sf2 |>
   group_by(year,stateProvince)|>
   count() |>
   ggplot(aes(x=year,y=n,fill=stateProvince)) +
@@ -368,25 +516,12 @@ cuja_regiones |>
     theme(legend.position = "none") 
 ```
 
+6.  Usa un modelo estadístico que explique la distribución del número de
+    registros de tu *G. cuja* por comuna
 
-6.  Usa un modelo estadístico que explique la distribución del número de registros de tu *G. cuja* por
-    comuna
-  a.  ¿Cuál(es) es(son) la(s) variable(s) independe(s) que mejor se asocian con la presencia de tu *especie de
-    preferencia*?
-R:
+```{=html}
+<!-- -->
+```
+a.  ¿Cuál(es) es(son) la(s) variable(s) independe(s) que mejor se
+    asocian con la presencia de tu *especie de preferencia*? R:
 
-### Predicción
-7.  Indica cual es la predicción para la distribución de tu *especie de preferencia* en las comunas de
-  -   Putre
-  -   Colchagua
-  -   Melipeuco
-  -   Maullín
-  -   Rio Hualaihué
-  -   Puerto Natales
-¿Cuántos registros se espera en cada una de estas comunas?
-
-8.  Haz un mapa de distribución patra tu *especie de preferencia* en todo Chile.
-9.  Discute tus resultados desde las siguientes perspectivas:
-  a.  Técnicas la construcción del modelo elegido
-  b.  Biológica y de conservación de tu *especie de preferencia
-  
